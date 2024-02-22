@@ -4,9 +4,10 @@
 
 //! # dynamic_object
 //!
-//! `dynamic_object` is a library that provides a dynamic, type-erased, key-value map in Rust.
+//! `dynamic_object` provides an easy way to create dynamic, type-erased, key-value maps in Rust.
 //! It allows you to store any value that implements the `Any` trait and retrieve it with type checking at runtime.
 //! This is particularly useful when you need a map to hold values of different types and you can't determine the types at compile time.
+//!
 //! It also provides a macro for easy and intuitive object creation.
 //!
 //! ## Features
