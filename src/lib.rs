@@ -21,7 +21,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! dynamic_object = { git = "https://github.com/trvswgnr/dynamic-object" }
+//! dynamic_object = { git = "https://github.com/trvswgnr/dynamic_object" }
 //! ```
 //!
 //! You can create an `Object` and insert any type that implements `Any`:
@@ -68,7 +68,7 @@
 //!
 //! ## Repository
 //!
-//! The source code for `dynamic_object` is available on GitHub at [github.com/trvswgnr/dynamic-object](https://github.com/trvswgnr/dynamic-object).
+//! The source code for `dynamic_object` is available on GitHub at [github.com/trvswgnr/dynamic_object](https://github.com/trvswgnr/dynamic_object).
 //!
 //! ## Contributions
 //!
