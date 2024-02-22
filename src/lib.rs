@@ -4,7 +4,10 @@
 
 //! # dynamic_object
 //!
-//! `dynamic_object` is a library that provides a dynamic, type-erased, key-value map in Rust. It allows you to store any value that implements the `Any` trait and retrieve it with type checking at runtime. This is particularly useful when you need a map to hold values of different types and you can't determine the types at compile time.
+//! `dynamic_object` is a library that provides a dynamic, type-erased, key-value map in Rust.
+//! It allows you to store any value that implements the `Any` trait and retrieve it with type checking at runtime.
+//! This is particularly useful when you need a map to hold values of different types and you can't determine the types at compile time.
+//! It also provides a macro for easy and intuitive object creation.
 //!
 //! ## Features
 //!
@@ -186,7 +189,6 @@ pub struct AnyType {
 
 impl Drop for AnyType {
     fn drop(&mut self) {
-        // This is safe because the value is leaked, so it will never be dropped.
         let x = unsafe { Box::from_raw(self.value as *mut dyn Any) };
         std::mem::drop(x);
     }
