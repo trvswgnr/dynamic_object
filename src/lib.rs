@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+#![deny(unsafe_code)]
 #![deny(missing_debug_implementations)]
 #![cfg_attr(test, deny(rust_2018_idioms))]
 
@@ -61,12 +62,6 @@
 //! assert_eq!(obj.get_as::<&str>("key1"), Some(&"value1"));
 //! ```
 //!
-//! ## Safety
-//!
-//! The `AnyType` struct uses `Box::leak` to create a `'static` reference, which means the value will
-//! live for the entire duration of the program. Therefore, it's safe to use and doesn't require the
-//! user to manage the lifetime of the value.
-//!
 //! ## Repository
 //!
 //! The source code for `dynamic_object` is available on GitHub at [github.com/trvswgnr/dynamic_object](https://github.com/trvswgnr/dynamic_object).
@@ -81,8 +76,10 @@
 
 use std::{
     any::Any,
-    collections::HashMap,
+    cmp::Ordering,
+    collections::BTreeMap,
     ops::{Deref, DerefMut},
+    fmt::{self, Debug, Formatter},
 };
 
 /// Creates a new `Object`.
@@ -112,12 +109,6 @@ use std::{
 ///   The keys must be identifiers, and the values can be any expression.
 ///   If a value is surrounded by `{}` it is treated as another `Object`.
 ///
-/// # Safety
-///
-/// The `object` macro is safe to use, but the `AnyType` struct uses raw pointers to
-/// store its value, which is inherently unsafe. The `AnyType` struct takes ownership of the value
-/// and leaks it, so it will never be dropped.
-///
 /// # Representation
 ///
 /// The `object` macro is expanded to a series of `insert` calls on a new `Object`. The keys are
@@ -125,7 +116,7 @@ use std::{
 #[macro_export]
 macro_rules! object {
     ({}) => {
-        $crate::Object::default()
+        $crate::Object::new()
     };
     ({
         $key:ident: { $($inner:tt)* }, $($rest:tt)*
@@ -148,106 +139,74 @@ macro_rules! object {
 }
 
 /// A type-erased value.
-///
-/// The `AnyType` struct is a type that includes any value that implements the `Any` trait.
-/// It stores a raw pointer to the value, which can be downcast to its original type.
-///
-/// # Examples
-///
-/// You can create an `AnyType` from any type that implements `Any`:
-///
-/// ```
-/// use dynamic_object::AnyType;
-/// let any = AnyType::from("Hello, world!");
-/// ```
-///
-/// You can downcast an `AnyType` back to a reference of its original type:
-///
-/// ```
-/// use dynamic_object::AnyType;
-/// let any = AnyType::from("Hello, world!");
-/// let string = any.downcast_ref::<&str>();
-/// assert_eq!(string, Some(&"Hello, world!"));
-/// ```
-///
-/// # Safety
-///
-/// The `AnyType` struct uses raw pointers to store its value, which is inherently unsafe. The `new`
-/// function takes ownership of the value, and leaks it, so it will never be dropped. The `downcast_ref`
-/// function returns a reference to the original value, but it's unsafe because of the dangers of dereferencing raw pointers.
-///
-/// # Representation
-///
-/// An `AnyType` is made up of a single component: a raw pointer to a value that implements `Any`.
-/// This pointer points to a heap-allocated value.
-///
-/// [Any]: core::any::Any "any::Any"
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct AnyType {
-    /// A raw pointer to the value.
-    value: *const dyn Any,
+pub trait AnyType: Any {
+    /// Upcast to `Any`.
+    fn as_any(&self) -> &dyn Any;
+
+    /// Upcast to `Any` mutably.
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+
+    /// Compare with another type-erased value.
+    fn dyn_cmp(&self, other: &dyn AnyType) -> Option<Ordering>;
+
+    /// Write the `Debug` representation.
+    fn dyn_debug(&self, f: &mut Formatter<'_>) -> fmt::Result;
 }
 
-impl Drop for AnyType {
-    fn drop(&mut self) {
-        let x = unsafe { Box::from_raw(self.value as *mut dyn Any) };
-        std::mem::drop(x);
+impl<T: Any + Debug + PartialOrd> AnyType for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn dyn_cmp(&self, other: &dyn AnyType) -> Option<Ordering> {
+        other
+            .as_any()
+            .downcast_ref::<T>()
+            .and_then(|other| self.partial_cmp(other))
+    }
+
+    fn dyn_debug(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self, f)
     }
 }
 
-impl AnyType {
-    /// Creates a new `AnyType` from a value.
-    ///
-    /// This function takes ownership of the value, and leaks it, so it will never be dropped.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use dynamic_object::AnyType;
-    /// let any = AnyType::from("Hello, world!");
-    /// ```
-    pub fn from<T: Any>(value: T) -> Self {
-        let value: *const dyn Any = Box::leak(Box::new(value));
-        Self { value }
-    }
-
-    /// Creates a new `AnyType` from a default value.
-    ///
-    /// This function is useful when you want to create an `AnyType` from a type that implements
-    /// `Any` and `Default`. It takes ownership of the value, and leaks it, so it will never be
-    /// dropped.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use dynamic_object::AnyType;
-    /// let any = AnyType::new::<&str>();
-    /// ```
-    pub fn new<T: Any + Default>() -> Self {
-        Self::from(T::default())
-    }
-
-    /// Returns a reference to the original value if it is of type `T`, or `None` if it isn't.
-    ///
-    /// This function contains an unsafe block because it dereferences a raw pointer, which is
-    /// inherently unsafe.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use dynamic_object::AnyType;
-    /// let any = AnyType::from("Hello, world!");
-    /// let string = any.downcast_ref::<&str>();
-    /// assert_eq!(string, Some(&"Hello, world!"));
-    /// ```
+impl dyn AnyType + '_ {
+    /// Convenience method.
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
-        unsafe { (*self.value).downcast_ref() }
+        self.as_any().downcast_ref::<T>()
+    }
+
+    /// Convenience method.
+    pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.as_any_mut().downcast_mut::<T>()
     }
 }
 
-/// A type-erased, key-value map.
+impl PartialOrd for dyn AnyType + '_ {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.dyn_cmp(other)
+    }
+}
+
+impl PartialEq for dyn AnyType + '_ {
+    fn eq(&self, other: &Self) -> bool {
+        self.partial_cmp(other).is_some_and(Ordering::is_eq)
+    }
+}
+
+impl Debug for dyn AnyType + '_ {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.dyn_debug(f)
+    }
+}
+
+/// A type-erased key-value map.
 ///
-/// The `Object` struct is a wrapper around a `HashMap` that allows storing any value that implements the `Any` trait.
+/// The `Object` struct is a wrapper around a `BTreeMap` that allows storing any value that implements the `Any` trait.
 /// It provides methods for inserting and retrieving values, with type checking at runtime.
 ///
 /// # Examples
@@ -272,12 +231,6 @@ impl AnyType {
 ///
 /// If it isn't of the correct type, you will get `None`.
 ///
-/// # Safety
-///
-/// The `Object` struct uses `AnyType` to store its values, so the same safety concerns apply.
-/// The `get_as` and `get_or_insert_as` functions return a reference to the original value, but they are unsafe
-/// because of the dangers of dereferencing raw pointers.
-///
 /// # Downcasting
 ///
 /// The `get_as` and `get_or_insert_as` methods attempt to downcast the value to the correct type.
@@ -285,10 +238,10 @@ impl AnyType {
 ///
 /// [Any]: core::any::Any "any::Any"
 /// [AnyType]: crate::AnyType "AnyType"
-/// [HashMap]: std::collections::HashMap "collections::HashMap"
-#[derive(Debug, PartialEq)]
+/// [BTreeMap]: std::collections::BTreeMap "collections::BTreeMap"
+#[derive(Default, Debug, PartialEq, PartialOrd)]
 pub struct Object {
-    map: HashMap<String, AnyType>,
+    map: BTreeMap<String, Box<dyn AnyType>>,
 }
 
 impl Object {
@@ -301,8 +254,7 @@ impl Object {
     /// let object = Object::new();
     /// ```
     pub fn new() -> Self {
-        let map = HashMap::new();
-        Self { map }
+        Self::default()
     }
 
     /// Inserts a key-value pair into the `Object`.
@@ -314,8 +266,8 @@ impl Object {
     /// let mut object = Object::new();
     /// object.insert("key", "value");
     /// ```
-    pub fn insert<K: Into<String>, V: Any>(&mut self, key: K, value: V) {
-        self.map.insert(key.into(), AnyType::from(value));
+    pub fn insert<K: Into<String>, V: AnyType>(&mut self, key: K, value: V) {
+        self.map.insert(key.into(), Box::new(value));
     }
 
     /// Returns a reference to the value corresponding to the key if it is of type `T`, or `None` if it isn't.
@@ -332,7 +284,7 @@ impl Object {
     /// assert_eq!(value, Some(&"value"));
     /// ```
     pub fn get_as<T: 'static>(&self, key: &str) -> Option<&T> {
-        self.map.get(key).and_then(|v| v.downcast_ref::<T>())
+        self.map.get(key).and_then(|v| (**v).as_any().downcast_ref::<T>())
     }
 
     /// Returns a reference to the value corresponding to the key if it is of type `T`, or inserts it if it doesn't exist.
@@ -345,24 +297,18 @@ impl Object {
     /// use dynamic_object::Object;
     /// let mut object = Object::new();
     /// let value = object.get_or_insert_as("key", "value");
-    /// assert_eq!(value, Some(&"value"));
+    /// assert_eq!(value, Some(&mut "value"));
     /// ```
-    pub fn get_or_insert_as<T: 'static>(&mut self, key: impl Into<String>, value: T) -> Option<&T> {
-        self.map
-            .entry(key.into())
-            .or_insert(AnyType::from(value))
-            .downcast_ref::<T>()
-    }
-}
+    pub fn get_or_insert_as<T: AnyType>(&mut self, key: impl Into<String>, value: T) -> Option<&mut T> {
+        let bx = self.map.entry(key.into()).or_insert_with(|| Box::new(value));
 
-impl Default for Object {
-    fn default() -> Self {
-        Self::new()
+        (**bx).as_any_mut().downcast_mut::<T>()
     }
 }
 
 impl Deref for Object {
-    type Target = HashMap<String, AnyType>;
+    type Target = BTreeMap<String, Box<dyn AnyType>>;
+
     fn deref(&self) -> &Self::Target {
         &self.map
     }
@@ -378,7 +324,7 @@ impl DerefMut for Object {
 mod tests {
     use super::*;
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, PartialOrd)]
     struct Foo {
         bar: i32,
     }
