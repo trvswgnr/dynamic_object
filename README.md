@@ -1,8 +1,8 @@
-# dynamic_object: Dynamic, Type-Erased Key-Value Maps in Rust
+# Dynamic, Type-Erased Key-Value Maps in Rust
 
-Do you love Rust but are tired of being constrained by static typing when you need a map to hold values of different types? Do you wish you could have the flexibility of JavaScript objects in Rust? Look no further - `dynamic_object` is here to save the day!
+Do you love Rust but are tired of being constrained by static typing when you need a map to hold values of different types? Do you wish you could have the simple syntax and flexibility of **JavaScript** objects in **Rust**? Look no further - `dynamic_object` is here to save the day!
 
-`dynamic_object` is a Rust crate that provides an easy way to create dynamic, type-erased, key-value maps. It allows you to store any value that implements the `Any` trait and retrieve it with type checking at runtime. This is particularly useful when you need a map to hold values of different types and you can't determine the types at compile time.
+The `dynamic_object` crate provides an easy way to create dynamic, type-erased, key-value maps. It allows you to store any value that implements the `Any` trait and retrieve it with type checking at runtime. This is particularly useful when you need a map to hold values of different types and you can't determine the types at compile time.
 
 ## Features
 
