@@ -1,4 +1,4 @@
-# Dynamic, Type-Erased Key-Value Maps in Rust
+# Dynamic Objects in Rust
 
 Do you love Rust but are tired of being constrained by static typing when you need a map to hold values of different types? Do you wish you could have the simple syntax and flexibility of **JavaScript** objects in **Rust**? Look no further - `dynamic_object` is here to save the day!
 
