@@ -446,4 +446,163 @@ mod tests {
             Some(&"baz")
         );
     }
+
+    #[test]
+    fn test_equality() {
+        let a = object!({
+            foo: "bar",
+            baz: 123,
+        });
+        let b = object!({
+            foo: "bar",
+            baz: 123,
+        });
+        assert_eq!(a, b);
+
+        let a = object!({
+            foo: "bar",
+            baz: 123,
+        });
+        let b = object!({
+            foo: "bar",
+            baz: 456,
+        });
+        assert_ne!(a, b);
+
+        let a = object!({
+            foo: "bar",
+            baz: 123,
+        });
+        let b = object!({
+            foo: "bar",
+            baz: 123,
+            qux: "quux",
+        });
+        assert_ne!(a, b);
+
+        let a = object!({
+            foo: "bar",
+            baz: {
+                qux: "quux",
+            },
+        });
+        let b = object!({
+            foo: "bar",
+            baz: {
+                qux: "quux",
+            },
+        });
+        assert_eq!(a, b);
+
+        let a = object!({
+            foo: Foo { bar: 123 },
+        });
+        let b = object!({
+            foo: Foo { bar: 123 },
+        });
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_ordering() {
+        let a = object!({
+            foo: "bar",
+            baz: 123,
+        });
+        let b = object!({
+            foo: "bar",
+            baz: 123,
+        });
+        assert_eq!(a.partial_cmp(&b), Some(Ordering::Equal));
+
+        let a = object!({
+            foo: "bar",
+            baz: 123,
+        });
+        let b = object!({
+            foo: "bar",
+            baz: 456,
+        });
+        assert_eq!(a.partial_cmp(&b), Some(Ordering::Less));
+
+        let a = object!({
+            foo: "bar",
+            baz: 123,
+        });
+        let b = object!({
+            foo: "bar",
+            baz: 123,
+            qux: "quux",
+        });
+        assert_eq!(a.partial_cmp(&b), Some(Ordering::Less));
+
+        let a = object!({
+            foo: "bar",
+            baz: {
+                qux: "quux",
+            },
+        });
+        let b = object!({
+            foo: "bar",
+            baz: {
+                qux: "quux",
+            },
+        });
+        assert_eq!(a.partial_cmp(&b), Some(Ordering::Equal));
+
+        let a = object!({
+            foo: Foo { bar: 123 },
+        });
+        let b = object!({
+            foo: Foo { bar: 123 },
+        });
+        assert_eq!(a.partial_cmp(&b), Some(Ordering::Equal));
+    }
+
+    #[test]
+    fn test_debug() {
+        let obj = object!({
+            foo: "bar",
+            baz: 123,
+        });
+        assert_eq!(
+            format!("{:?}", obj),
+            r#"Object { map: {"baz": 123, "foo": "bar"} }"#
+        );
+    }
+
+    #[test]
+    fn preserves_order() {
+        let obj = object!({
+            foo: "bar",
+            baz: 123,
+        });
+        let keys: Vec<_> = obj.keys().cloned().collect();
+        assert_eq!(keys, vec!["baz", "foo"]);
+
+        let obj = object!({
+            foo: "bar",
+            baz: 123,
+            qux: "quux",
+        });
+        let keys: Vec<_> = obj.keys().cloned().collect();
+        assert_eq!(keys, vec!["baz", "foo", "qux"]);
+
+        let obj = object!({
+            foo: "bar",
+            baz: {
+                qux: "quux",
+            },
+        });
+
+        let keys: Vec<_> = obj.keys().cloned().collect();
+        let entries = obj.iter().collect::<Vec<_>>();
+
+        for (i, (k, v)) in obj.iter().enumerate() {
+            let key = keys[i].clone();
+            assert_eq!(k, &key);
+            assert_eq!(entries[i].0, &key);
+            assert_eq!(entries[i].1, v);
+        }
+    }
 }
