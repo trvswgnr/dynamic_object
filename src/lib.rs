@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 #![deny(missing_debug_implementations)]
-#![cfg_attr(test, deny(rust_2018_idioms))]
+#![deny(rust_2018_idioms)]
 
 //! # dynamic_object
 //!
@@ -78,8 +78,8 @@ use std::{
     any::Any,
     cmp::Ordering,
     collections::BTreeMap,
-    ops::{Deref, DerefMut},
     fmt::{self, Debug, Formatter},
+    ops::{Deref, DerefMut},
 };
 
 /// Creates a new `Object`.
@@ -284,7 +284,9 @@ impl Object {
     /// assert_eq!(value, Some(&"value"));
     /// ```
     pub fn get_as<T: 'static>(&self, key: &str) -> Option<&T> {
-        self.map.get(key).and_then(|v| (**v).as_any().downcast_ref::<T>())
+        self.map
+            .get(key)
+            .and_then(|v| (**v).as_any().downcast_ref::<T>())
     }
 
     /// Returns a reference to the value corresponding to the key if it is of type `T`, or inserts it if it doesn't exist.
@@ -299,8 +301,15 @@ impl Object {
     /// let value = object.get_or_insert_as("key", "value");
     /// assert_eq!(value, Some(&mut "value"));
     /// ```
-    pub fn get_or_insert_as<T: AnyType>(&mut self, key: impl Into<String>, value: T) -> Option<&mut T> {
-        let bx = self.map.entry(key.into()).or_insert_with(|| Box::new(value));
+    pub fn get_or_insert_as<T: AnyType>(
+        &mut self,
+        key: impl Into<String>,
+        value: T,
+    ) -> Option<&mut T> {
+        let bx = self
+            .map
+            .entry(key.into())
+            .or_insert_with(|| Box::new(value));
 
         (**bx).as_any_mut().downcast_mut::<T>()
     }
